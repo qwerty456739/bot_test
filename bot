@@ -1,1 +1,126 @@
-print('hello')
+from aiogram import Bot, types
+from aiogram.dispatcher import Dispatcher, FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.utils import executor
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher.filters import Text
+
+import os, json, string
+
+
+storage_memory=MemoryStorage()
+
+bot = Bot(token=os.getenv('TOKEN'))
+dp = Dispatcher(bot,storage=storage_memory)
+
+async def bot_startap(_):
+    print('Бот работает')
+
+      # ********************************* Пользовательская часть ********************** '''
+
+b1 = KeyboardButton('/start')
+b2 = KeyboardButton('/help')
+b3 = KeyboardButton('/place')
+b4 = KeyboardButton('/info')
+#b5 = KeyboardButton('/Телефон', request_contact=True)
+#b6 = KeyboardButton('\Где я ', request_location=True)
+#b7 = KeyboardButton('/user', request_user=True)
+#b8 = KeyboardButton('/chat', request_chat=True)
+#b9 = KeyboardButton('/poll', request_poll=True)
+#b10 = KeyboardButton('/Заказать')
+
+kb_client = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+kb_client.add(b1).add(b2).add(b3).add(b4)#.row(b5, b6)  #.insert(b7).row(b8, b9)
+#kb_client.insert(b1).insert(b2).insert(b3).insert(b4), insert(b5), insert(b6)
+#kb_client.row(b1, b2, b3, b4, b5, b6)
+
+@dp.message_handler(commands=['start', 'help'])
+async def command_start_help(message : types.Message):
+    if message.text == '/start':
+        await message.answer('Расписание пока не готово', reply_markup=kb_client)
+    elif message.text == '/help':
+        await message.answer('Сам справишься ')
+
+@dp.message_handler(commands=['place'])
+async def command_place(message: types.Message):
+    await message.answer('Lenina 24')
+
+
+@dp.message_handler(commands=['info'])
+async def command_info(message: types.Message):
+    await message.answer('Расписание Bot Telegram')
+
+
+# ********************************* Общая часть ********************** '''
+
+
+
+
+    #if message.text =='Привет':
+
+        #await message.answer('Салам')
+     #await message.answer(message.text)
+    #await bot.send_message(message.from_user.id, message.text)
+    #await bot.send_message(message.from_user.id, 'Расписание пока не готово')
+
+
+# ********************************* Админская часть ********************** '''
+
+class FSMAdmin(StatesGroup):
+    photo = State()
+    name = State()
+    description = State()
+    price = State()
+
+@dp.message_handler(commands=['Заказать'], state=None)
+async def cm_start(message: types.Message):
+    await FSMAdmin.photo.set()
+    await message.reply('Загрузи фото')
+
+
+@dp.message_handler(content_types=['photo'], state=FSMAdmin.photo)
+async def load_photo(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['photo'] = message.photo[0].file_id
+    await FSMAdmin.next()
+    await message.rebly('Теперь введи значение')
+
+@dp.message_handler(state=FSMAdmin.name)
+async def load_name(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name'] = message.text
+    await FSMAdmin.next()
+    await message.reply('Описание')
+
+@dp.message_handler(state=FSMAdmin.description)
+async def load_description(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['description'] = message.text
+        await FSMAdmin.next()
+        await message.reply('Цена')
+
+@dp.message_handler(state=FSMAdmin.price)
+async def load_price(message: types.message, state: FSMContext):
+    async with state.proxy() as date:
+        date['price'] = float(message.text)
+    async with state.proxy() as data:
+        await message.reply(str(data))
+    await state.finish()
+
+
+
+      # ********************************* Пользовательская часть ********************** '''
+
+@dp.message_handler()
+async def echo_chat(message : types.Message):
+    if message.text == 'Привет':
+        await message.answer('И тебе привет')
+    if {i.lower().translate(str.maketrans('', '', string.punctuation)) for i in message.text.split(' ')}\
+        .intersection(set(json.load(open('list.json')))) != set():
+        await message.reply('Маты запрещены')
+        await message.delete()
+
+
+
+executor.start_polling(dp, skip_updates=True, on_startup=bot_startap)
